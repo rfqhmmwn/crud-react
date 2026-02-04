@@ -30,35 +30,50 @@ class Index extends CI_Controller
 
 	public function delete($id)
 	{
+		$old = $this->index->get_by_id($id);
+
+		if ($old && !empty($old->gambar)) {
+			$path = FCPATH . 'uploads/' . $old->gambar;
+			if (file_exists($path)) {
+				unlink($path);
+			}
+		}
+
 		$this->index->delete($id);
 	}
 
 	public function insert()
-	{
-		header("Content-Type: application/json");
+    {
+        $config['upload_path']   = FCPATH . 'uploads/';
+        $config['allowed_types'] = 'jpg|jpeg|png|gif';
+        $config['max_size']      = 2048;
+        $config['encrypt_name']  = TRUE;
 
-		$data = [
-			'judul' => $this->input->post('judul'),
-			'deskripsi' => $this->input->post('deskripsi'),
-			'rilis' => $this->input->post('rilis'),
-		];
+        $this->load->library('upload', $config);
 
-		if (empty($data['judul']) || empty($data['deskripsi']) || empty($data['rilis'])) 
-		{
-			echo json_encode([
-				'status' => 'error',
-				'message' => 'Data tidak lengkap'
-			]);
-			return;
-		}
+        if (!$this->upload->do_upload('image')) {
+            echo json_encode([
+                'status' => 'error',
+                'message' => $this->upload->display_errors('', '')
+            ]);
+            return;
+        }
 
-		$this->index->insert($data);
+        $upload = $this->upload->data();
 
-		echo json_encode([
-			'status' => 'success',
-			'message' => 'Data berhasil ditambahkan'
-		]);
-	}
+        $data = [
+            'judul' => $this->input->post('judul'),
+            'deskripsi' => $this->input->post('deskripsi'),
+            'rilis' => $this->input->post('rilis'),
+            'gambar' => $upload['file_name']
+        ];
+
+        $this->index->insert($data);
+
+        echo json_encode([
+            'status' => 'success'
+        ]);
+    }
 
 	public function get_by_id($id)
 	{
@@ -70,27 +85,48 @@ class Index extends CI_Controller
 	{
 		header("Content-Type: application/json");
 
-		$data = json_decode(file_get_contents("php://input"), true);
-
-		if (!$data) 
-		{
-			echo json_encode([
-				'status' => 'error',
-				'message' => 'Invalid JSON'
-			]);
-			return;
-		}
-
 		if (
-			empty($data['judul']) ||
-			empty($data['deskripsi']) ||
-			empty($data['rilis'])
+			empty($_POST['judul']) ||
+			empty($_POST['deskripsi']) ||
+			empty($_POST['rilis'])
 		) {
 			echo json_encode([
 				'status' => 'error',
 				'message' => 'Data tidak lengkap'
 			]);
 			return;
+		}
+
+		$data = [
+			'judul' => $this->input->post('judul'),
+			'deskripsi' => $this->input->post('deskripsi'),
+			'rilis' => $this->input->post('rilis'),
+		];
+
+		if (!empty($_FILES['image']['name'])) {
+
+			$config['upload_path']   = FCPATH . 'uploads/';
+			$config['allowed_types'] = 'jpg|jpeg|png|gif';
+			$config['max_size']      = 2048;
+			$config['encrypt_name']  = TRUE;
+
+			$this->load->library('upload', $config);
+
+			if (!$this->upload->do_upload('image')) {
+				echo json_encode([
+					'status' => 'error',
+					'message' => $this->upload->display_errors('', '')
+				]);
+				return;
+			}
+
+			$upload = $this->upload->data();
+			$data['gambar'] = $upload['file_name'];
+
+			$old = $this->index->get_by_id($id);
+			if ($old && file_exists(FCPATH . 'uploads/' . $old->gambar)) {
+				unlink(FCPATH . 'uploads/' . $old->gambar);
+			}
 		}
 
 		$this->index->update($id, $data);
@@ -100,6 +136,7 @@ class Index extends CI_Controller
 			'message' => 'Data berhasil diupdate'
 		]);
 	}
+
 
 
 }
